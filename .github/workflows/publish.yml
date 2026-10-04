@@ -22,4 +22,4 @@ jobs:
           version=$(nix eval --raw .#jq.version)
           export ORAS_REGISTRY_CONFIG="$RUNNER_TEMP/ghcr-auth.json"
           printf '%s' "$GHCR_TOKEN" | nix develop -c oras login --registry-config "$ORAS_REGISTRY_CONFIG" --username "$GHCR_USER" --password-stdin ghcr.io
-          nix develop -c oras cp --registry-config "$ORAS_REGISTRY_CONFIG" --from-oci-layout "result-oci:$version" "$registry:$version"
+          nix develop -c oras cp --to-registry-config "$ORAS_REGISTRY_CONFIG" --from-oci-layout "result-oci:$version" "$registry:$version"
