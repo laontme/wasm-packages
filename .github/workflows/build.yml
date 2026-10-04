@@ -1,0 +1,25 @@
+name: Build WASI packages
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  jq:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@v21
+      - run: nix flake check -L
+      - run: nix build .#jq -o result-jq
+      - run: nix build .#jq-oci -o result-oci
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jq-wasi
+          path: result-jq/bin/jq.wasm
+      - run: tar -chf jq-oci.tar -C result-oci .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jq-oci
+          path: jq-oci.tar

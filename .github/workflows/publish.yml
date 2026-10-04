@@ -1,0 +1,25 @@
+name: Publish jq to GHCR
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@v21
+      - run: nix flake check -L
+      - run: nix build .#jq-oci -o result-oci
+      - name: Publish versioned image
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          registry="ghcr.io/${REPOSITORY,,}/jq"
+          version=$(nix eval --raw .#jq.version)
+          export REGISTRY_AUTH_FILE="$RUNNER_TEMP/ghcr-auth.json"
+          printf '%s' "$GHCR_TOKEN" | nix develop -c skopeo login --username "$GHCR_USER" --password-stdin ghcr.io
+          nix develop -c skopeo copy --insecure-policy --preserve-digests "oci:result-oci:$version" "docker://$registry:$version"
