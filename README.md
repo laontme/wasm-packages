@@ -27,7 +27,7 @@ Build hosts: ARM64 and x86-64 Linux/macOS. The guest target is always
 ```sh
 nix flake check -L
 nix build .#jq-oci -o result-oci
-nix develop -c skopeo inspect --raw oci:result-oci:1.8.2
+nix develop -c oras manifest fetch --oci-layout result-oci:1.8.2
 ```
 
 Checks execute jq under Wasmtime (stdin, regex, arithmetic, slurp, mounted
@@ -35,24 +35,28 @@ files, and exit codes) and verify OCI blob digests and the packaged module.
 
 ## OCI contract
 
-`jq-oci` produces an OCI image layout, with one gzip-compressed tar layer:
+`jq-oci` produces an OCI layout following the
+[CNCF Wasm OCI artifact format](https://tag-runtime.cncf.io/wgs/wasm/deliverables/wasm-oci-artifact/).
+`lib/oci.nix` supplies metadata to ORAS, the standard OCI artifact client from
+pinned Nixpkgs. It does not implement blob or manifest serialization itself.
 
-`lib/oci.nix` is a small wrapper around pinned
-[systemstart/nix-oci](https://github.com/systemstart/nix-oci), which writes the
-OCI blobs and metadata. Shell only stages guest files and their permissions.
-Python is used only for validation. A local patch normalizes symlink modes
-across macOS/Linux; the writer's full upstream test suite remains enabled.
+- Manifest: `application/vnd.oci.image.manifest.v1+json`.
+- Config: `application/vnd.wasm.config.v0+json`, with `architecture: wasm`,
+  `os: wasip1`, and `layerDigests` matching the layer descriptor.
+- Exactly one layer: `application/wasm`, containing the raw jq module.
+- The first layer is the entrypoint; there is no filesystem entrypoint path,
+  tar archive, compression, container image config, or Nix store closure.
+- Source, version and license metadata are manifest annotations.
+- License notices remain in the Nix package and the `jq-wasi` CI artifact.
 
-- Platform: `wasi/wasm` (WASI Preview 1, recorded in `io.emmux.wasi.preview`).
-- Entrypoint: `/bin/jq.wasm`; caller arguments follow it.
-- Files: the module and jq/Oniguruma license notices under `/share/licenses/jq`.
-- No runtime, shell, base image, or Nix store closure inside the image.
-- Content-addressed blobs; sorted paths, fixed timestamps, ownership and modes.
+Consumers verify the manifest/config/layer digests, read the layer as a module,
+then run it with explicit stdin/stdout/stderr, arguments, environment and
+filesystem grants. Runtime arguments and mounts are supplied by the host.
+Metadata uses a fixed timestamp so identical inputs produce identical layouts.
 
-Consumers fetch the manifest/layer, extract the entrypoint, and run it in a
-WASI runtime with explicit stdin/stdout/stderr, arguments, environment and
-filesystem grants. This is an image distribution format; ordinary native
-Docker execution needs a WASI runtime integration.
+The initial published `1.8.2` artifact used a conventional container-image
+format (`wasi/wasm`, gzip tar). Consumers pinning that old digest retain the
+old format; the corrected artifact has a different manifest digest.
 
 emmux currently embeds Python through `goccy/go-python` / `pythonwasm2go`.
 Its current checkout has no generic WASI command runner or OCI package loader.
@@ -75,9 +79,8 @@ To publish manually when ready:
 ```sh
 nix build .#jq-oci -o result-oci
 nix develop
-skopeo login ghcr.io
-skopeo copy --insecure-policy --preserve-digests \
-  oci:result-oci:1.8.2 docker://ghcr.io/<owner>/<repo>/jq:1.8.2
+oras login ghcr.io
+oras cp --from-oci-layout result-oci:1.8.2 ghcr.io/<owner>/<repo>/jq:1.8.2
 ```
 
 ## Add a package

@@ -17,7 +17,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: jq-wasi
-          path: result-jq/bin/jq.wasm
+          path: |
+            result-jq/bin/jq.wasm
+            result-jq/share/licenses/jq/
       - run: tar -chf jq-oci.tar -C result-oci .
       - uses: actions/upload-artifact@v4
         with:

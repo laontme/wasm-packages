@@ -2,12 +2,7 @@
   description = "WASI command packages for emmux and other runtimes";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-  inputs.nix-oci = {
-    url = "github:systemstart/nix-oci/1f01d3a885cb7c7be5c99e40371c4e18f233fe24";
-    inputs.nixpkgs.follows = "nixpkgs";
-  };
-
-  outputs = { self, nixpkgs, nix-oci }:
+  outputs = { self, nixpkgs }:
     let
       systems = [ "aarch64-darwin" "x86_64-darwin" "aarch64-linux" "x86_64-linux" ];
       eachSystem = nixpkgs.lib.genAttrs systems;
@@ -19,18 +14,12 @@
             localSystem = system;
             crossSystem = nixpkgs.lib.systems.examples.wasm32-wasip1;
           };
-          ociWriter = nix-oci.packages.${system}.nix-oci.overrideAttrs (old: {
-            patches = (old.patches or [ ]) ++ [ ./patches/nix-oci-normalize-symlink-mode.patch ];
-          });
-          buildOCIImage = pkgs.callPackage "${nix-oci}/nix/build-image.nix" {
-            nix-oci = ociWriter;
-          };
           jq = cross.callPackage ./packages/jq.nix { upstream = pkgs.jq; };
         in {
           inherit jq;
           default = jq;
           jq-oci = import ./lib/oci.nix {
-            inherit pkgs buildOCIImage;
+            inherit pkgs;
             package = jq;
             name = "jq";
             entrypoint = "/bin/jq.wasm";
@@ -52,6 +41,6 @@
         });
       devShells = eachSystem (system:
         let pkgs = import nixpkgs { inherit system; };
-        in { default = pkgs.mkShell { packages = [ pkgs.wasmtime pkgs.skopeo ]; }; });
+        in { default = pkgs.mkShell { packages = [ pkgs.wasmtime pkgs.oras ]; }; });
     };
 }
