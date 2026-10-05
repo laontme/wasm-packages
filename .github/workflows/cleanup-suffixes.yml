@@ -1,0 +1,24 @@
+name: Remove obsolete WASI-suffixed versions
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete only versions carrying exclusively obsolete suffix tags
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for package in jq rg; do
+            gh api --paginate --slurp "users/laontme/packages/container/wasm-packages%2F$package/versions" | jq 'add' > versions.json
+            jq -e 'any(.[].metadata.container.tags[]; . == "latest")' versions.json
+            case "$package" in jq) version=1.8.2 ;; rg) version=15.2.0 ;; esac
+            jq -e --arg version "$version" 'any(.[].metadata.container.tags[]; . == $version)' versions.json
+            jq -r '.[] | select((.metadata.container.tags | length) > 0) | select(all(.metadata.container.tags[]; test("-wasip[123]$"))) | .id' versions.json > obsolete.txt
+            while read -r id; do
+              gh api --method DELETE "users/laontme/packages/container/wasm-packages%2F$package/versions/$id"
+            done < obsolete.txt
+          done

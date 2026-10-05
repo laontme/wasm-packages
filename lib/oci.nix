@@ -1,6 +1,7 @@
-{ pkgs, package, name, entrypoint, wasi ? "wasip1" }:
+{ pkgs, package, name, entrypoint, wasi ? "wasip1", commands ? [ name ] }:
 let
   annotations = {
+    "me.laont.wasm.commands" = pkgs.lib.concatStringsSep "," commands;
     "org.opencontainers.image.title" = name;
     "org.opencontainers.image.version" = package.version;
     "org.opencontainers.image.source" = "https://github.com/laontme/wasm-packages";
@@ -12,6 +13,9 @@ let
     (key: value: "--annotation ${pkgs.lib.escapeShellArg "${key}=${value}"}") annotations);
 in
 assert pkgs.lib.hasPrefix "/" entrypoint;
+assert commands != [ ] && builtins.head commands == name;
+assert pkgs.lib.length (pkgs.lib.unique commands) == pkgs.lib.length commands;
+assert pkgs.lib.all (command: builtins.match "[^,[:space:]]+" command != null) commands;
 pkgs.runCommand "${name}-${package.version}-oci" {
   nativeBuildInputs = [ pkgs.oras pkgs.jq pkgs.coreutils ] ++ pkgs.lib.optional (wasi == "wasip2") pkgs.wasm-tools;
 } ''

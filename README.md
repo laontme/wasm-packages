@@ -1,130 +1,96 @@
 # wasm-packages
 
-Nix builds of WASI command-line tools, packaged as OCI images for emmux and
-other applications. Packages include **jq 1.8.2** and **ripgrep 15.2.0**. jq is built from upstream
-source with bundled Oniguruma (regex support) and decimal-number support.
-Nixpkgs, the source hash, and the LLVM/WASI toolchain are pinned by `flake.lock`.
+Nix builds of WASI command-line tools for Emmux and other consumers, published
+as CNCF Wasm OCI artifacts to GHCR.
+
+## Packages and tags
+
+| Package | Version | Minimum WASI | Commands | GHCR |
+|---|---|---|---|---|
+| jq | 1.8.2 | Preview 1 | `jq` | `ghcr.io/laontme/wasm-packages/jq:1.8.2` |
+| ripgrep | 15.2.0 | Preview 1 | `rg` | `ghcr.io/laontme/wasm-packages/rg:15.2.0` |
+
+Each package has a software-version tag and `latest`. Neither includes a WASI
+suffix. Build for the **lowest WASI version that supports the required tool
+behavior**: computation/file tools such as jq and rg use P1; a networking tool
+such as curl would target P2 when its port requires P2 networking. P3 is chosen
+only when needed. Do not publish redundant variants or a multi-platform index.
+The config records the selected WASI target, and consumers must check it.
+Pin a digest when exact bytes matter; version and `latest` tags may move.
+
+Nixpkgs and the toolchains are pinned in `flake.lock`. Ripgrep uses Rust 1.85.0.
+Build hosts are ARM64/x86-64 Linux/macOS; guest architecture is always Wasm.
+Different build hosts can produce different bytes, even with the same sources.
 
 ## Build and run
 
 ```sh
-nix build .#jq
+nix build .#jq -o result-jq
+nix build .#rg -o result-rg
+nix build .#rg-oci -o result-rg-oci
 nix develop
-printf '%s\n' '{"hello":"world"}' | wasmtime result/bin/jq.wasm -r '.hello'
-```
-
-The jq output is a standalone WASI Preview 1 core module exporting `_start`.
-No JavaScript glue or native libraries are needed. Files and directories must
-be explicitly mounted by the host:
-
-```sh
-wasmtime --dir .::/work result/bin/jq.wasm '.' /work/input.json
-```
-
-Build hosts: ARM64 and x86-64 Linux/macOS. The guest target is always
-`wasm32-unknown-wasip1`; it is independent of the build host's CPU.
-
-```sh
+printf '{"hello":"world"}\n' | wasmtime result-jq/bin/jq.wasm -r '.hello'
+printf 'hello world\n' | wasmtime result-rg/bin/rg.wasm hello -
+wasmtime --dir .::/work result-rg/bin/rg.wasm hello /work
 nix flake check -L
-nix build .#jq-oci -o result-oci
-nix develop -c oras manifest fetch --oci-layout result-oci:1.8.2
 ```
 
-Checks execute jq under Wasmtime (stdin, regex, arithmetic, slurp, mounted
-files, and exit codes) and verify OCI blob digests and the packaged module.
+Files/directories require explicit filesystem grants from the consumer.
+For rg stdin searches, pass `-`: upstream automatic stdin detection assumes
+stdin is not readable on platforms other than Unix/Windows. Ripgrep defaults
+to one thread on this target; multiple threads, PCRE2 (`-P`), external
+preprocessors and external decompression commands are unsupported. Normal
+Rust regex matching is supported. P1 retains rg's exit codes 0/1/2.
 
-## Ripgrep: Preview 1 and Preview 2
+## OCI and command discovery
 
-Both variants use pinned Rust **1.85.0**. `rg` aliases `rg-p1`.
-
-```sh
-nix build .#rg-p1 -o result-rg-p1
-nix build .#rg-p2 -o result-rg-p2
-nix develop
-printf 'hello world\n' | wasmtime result-rg-p1/bin/rg.wasm hello -
-printf 'hello world\n' | wasmtime result-rg-p2/bin/rg.wasm hello -
-wasmtime --dir .::/work result-rg-p2/bin/rg.wasm hello /work
-nix build .#rg-p1-oci -o result-rg-p1-oci
-nix build .#rg-p2-oci -o result-rg-p2-oci
-```
-
-- `rg-p1`: `wasm32-wasip1` core module exporting `_start`, for P1 hosts such as wazero.
-- `rg-p2`: directly compiled `wasm32-wasip2` component exporting `wasi:cli/run@0.2.0`, for component hosts. Plain wazero requires an additional component/P2 layer.
-- P2 imports are pinned by `tests/rg-p2-imports.txt` and checked against the built component. Rust's standard library includes TCP/UDP interface imports even though these search tests do not use networking. Consumers must satisfy the listed interfaces; networking imports do not imply a network grant.
-- Use an explicit `-` for stdin searches: upstream's automatic stdin detection assumes it is not readable on platforms other than Unix/Windows.
-- Searches use one thread by default on these WASI targets; requesting multiple threads is unsupported. PCRE2 (`-P`), external preprocessors (`--pre`), and external decompression commands are not supported by these builds. The normal Rust regex engine is available.
-- P1 retains statuses 0 (match), 1 (no match), and 2 (error). WASI 0.2 CLI exposes success/failure rather than numeric exit codes: P2 maps both no-match and errors to failure (Wasmtime status 1). Inspect stderr to distinguish them.
-
-Checks cover stdin, regex matching, case-insensitive file search, recursive traversal, ignore/hidden-file filtering, exit behavior, P2 validation/interface imports, and OCI descriptors. P2 is verified with Wasmtime here; execution in Emmux's developing P2 implementation remains an integration check there.
-
-CI builds separate binary/license and OCI-layout artifacts for `jq`, `rg-p1`, and `rg-p2`. Successful builds on pushes to `main` automatically publish the checked OCI artifacts. The manual publish workflow also accepts a package choice and targets `ghcr.io/<owner>/<repo>/rg:<version>-wasip1` or `rg:<version>-wasip2` for ripgrep, and `jq:<version>` for jq. Pull requests and other branches only build and test.
-
-Ripgrep shares one GHCR package, `ghcr.io/laontme/wasm-packages/rg`, with tags `15.2.0-wasip1` and `15.2.0-wasip2`. Nix attributes and CI artifact names remain `rg-p1` and `rg-p2`.
-
-## Image tags
-
-| Package | Explicit tags | Default version tag | `latest` |
-|---|---|---|---|
-| rg | `15.2.0-wasip1`, `15.2.0-wasip2` | `15.2.0` → P2 | P2 |
-| jq | `1.8.2-wasip1` | `1.8.2` → P1 | P1 |
-
-The default means the latest software release using the newest WASI target supported and tested for that package. Until jq has a P2 package, it defaults to P1. Only the default variant updates bare version and `latest` tags; publishing rg P1 cannot replace rg's P2 defaults. Consumers needing a fixed WASI target use the suffix; consumers needing fixed bytes pin a digest. Moving aliases can change when a new release or supported WASI variant is published.
-
-## OCI contract
-
-`jq-oci`, `rg-p1-oci`, and `rg-p2-oci` produce OCI layouts following the
-[CNCF Wasm OCI artifact format](https://tag-runtime.cncf.io/wgs/wasm/deliverables/wasm-oci-artifact/).
-`lib/oci.nix` supplies metadata to ORAS, the standard OCI artifact client from
-pinned Nixpkgs. It does not implement blob or manifest serialization itself.
+Layouts follow the [CNCF Wasm OCI format](https://tag-runtime.cncf.io/wgs/wasm/deliverables/wasm-oci-artifact/).
+`lib/oci.nix` uses ORAS to serialize and assemble artifacts.
 
 - Manifest: `application/vnd.oci.image.manifest.v1+json`.
-- Config: `application/vnd.wasm.config.v0+json`, with `architecture: wasm`,
-  `os: wasip1` for core modules or `os: wasip2` for the P2 component, and `layerDigests` matching the layer descriptor.
-- P2 configs include `component.imports` and `component.exports`, extracted from the built component.
-- Exactly one layer: `application/wasm`, containing the raw module or component.
-- The first layer is the entrypoint; there is no filesystem entrypoint path,
-  tar archive, compression, container image config, or Nix store closure.
-- Source, version and license metadata are manifest annotations.
-- License notices remain in the Nix package and the `jq-wasi` CI artifact.
+- Config: `application/vnd.wasm.config.v0+json`, `architecture: wasm`,
+  `os: wasip1` (or the minimum required target), and matching `layerDigests`.
+- One raw `application/wasm` layer; no tar layer, compression or Nix closure.
+- P2 components include their imports/exports in `component` config metadata.
+- Manifest annotation `me.laont.wasm.commands` is an ordered comma-separated
+  string: `jq` or `rg` for current packages. No spaces or duplicate entries.
+  The package's main command is first.
+- Source, version, license and a fixed creation timestamp are annotations.
+  License notices remain in the Nix package and CI binary/license artifact.
 
-Consumers verify the manifest/config/layer digests, read the layer as a module,
-then run it with explicit stdin/stdout/stderr, arguments, environment and
-filesystem grants. Runtime arguments and mounts are supplied by the host.
-Metadata uses a fixed timestamp so identical inputs produce identical layouts.
+For a multicall coreutils package, the annotation will look like
+`coreutils,cat,cp,mv,rm,...`, with the complete supported command list derived
+from the built executable. `coreutils` is first and supports dispatch such as
+`coreutils cat /work/file`. The consumer can expose each listed applet using
+the same module; it must preserve the requested invocation, either through the
+multicall binary's argv[0] dispatch or by invoking `coreutils <applet> ...`.
+The annotation advertises commands; it does not grant permissions or claim
+that all POSIX features are supported.
 
-The initial published `1.8.2` artifact used a conventional container-image
-format (`wasi/wasm`, gzip tar). Consumers pinning that old digest retain the
-old format; the corrected artifact has a different manifest digest.
+Consumers verify all digests and target requirements before executing with
+explicit arguments, environment, standard streams and filesystem grants.
+Checks cover jq processing and rg matching, traversal, ignore rules, stdin,
+exit codes, plus OCI content and command metadata.
 
-emmux currently embeds Python through `goccy/go-python` / `pythonwasm2go`.
-Its current checkout has no generic WASI command runner or OCI package loader.
-This repo defines a proposed package contract; adding that consumer to emmux
-is separate work. File access depends on preopens; process creation and Unix
-signal behavior are constrained by WASI. Time-zone-dependent functions need
-runtime-specific support and are not covered by the smoke checks.
+## CI/CD
 
-## Publishing
+Pushes, pull requests and manual builds check packages and upload their binaries,
+licenses and OCI layouts. After all checks pass, pushes to `main` automatically
+publish the exact checked layouts under version tags and update `latest`.
+The separate manual publish workflow accepts `jq` or `rg`. Local builds never
+publish. GHCR package visibility is managed separately in GitHub.
 
-Local builds and checks do not publish. The build workflow tests and uploads
-GitHub Actions artifacts, then publishes all packages after all checks pass
-on pushes to `main`. It copies the checked OCI layouts without rebuilding.
-The separate publish workflow supports manual publication of one package to
-`ghcr.io/<owner>/<repo>/rg:<version>-wasip1` or `rg:<version>-wasip2` for ripgrep, and `jq:<version>` for jq, using `GITHUB_TOKEN` with `packages:write`.
-Bare version and `latest` tags select the newest supported WASI variant: P2 for rg, P1 for jq. These tags alias the explicit variant and have identical manifest digests. GHCR package visibility is managed
-separately in GitHub.
+## Next package: full uutils coreutils
 
-To publish manually when ready:
+Package one multicall executable as `coreutils`, rather than separate images
+for individual applets. Inventory and build the full upstream command suite;
+do not silently select a small subset to make the build pass. Determine the
+minimum WASI target from actual functionality and dependencies, and record
+unavailable OS features explicitly. A full suite may require porting because
+WASI does not provide all native process, user-management or terminal APIs.
 
-```sh
-nix build .#jq-oci -o result-oci
-nix develop
-oras login ghcr.io
-oras cp --from-oci-layout result-oci:1.8.2 ghcr.io/<owner>/<repo>/jq:1.8.2
-```
-
-## Add a package
-
-Add its cross-build derivation under `packages/`, expose it in `flake.nix`,
-then call `lib/oci.nix` with its output, name, and absolute guest entrypoint.
-Add runtime checks before exposing a publishing workflow. Keep package
-outputs limited to guest files and license notices.
+Expose `coreutils` and `coreutils-oci` in the flake. Supply `commands` to
+`lib/oci.nix`, with `coreutils` first and the built applets following. Add the
+package to both workflow matrices/choices. Verify the advertised list against
+the binary, test `coreutils <applet>` dispatch, and exercise representative
+read/write/filesystem operations with grants and expected exit codes.

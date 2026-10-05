@@ -17,6 +17,12 @@ assert json.loads((root / "oci-layout").read_text())["imageLayoutVersion"] == "1
 index = json.loads((root / "index.json").read_text())
 assert len(index["manifests"]) == 1
 manifest = json.loads(read(index["manifests"][0]))
+commands = manifest["annotations"]["me.laont.wasm.commands"].split(",")
+assert commands[0] == manifest["annotations"]["org.opencontainers.image.title"]
+assert len(commands) == len(set(commands))
+assert all(commands)
+if len(sys.argv) > 5:
+    assert commands == sys.argv[5].split(",")
 assert manifest["schemaVersion"] == 2
 assert manifest["mediaType"] == "application/vnd.oci.image.manifest.v1+json"
 assert manifest["config"]["mediaType"] == "application/vnd.wasm.config.v0+json"
