@@ -31,10 +31,10 @@
           default = jq;
           rg = rg-p1;
           rg-p1-oci = import ./lib/oci.nix {
-            inherit pkgs; package = rg-p1; name = "rg-p1"; entrypoint = "/bin/rg.wasm";
+            inherit pkgs; package = rg-p1; name = "rg"; entrypoint = "/bin/rg.wasm";
           };
           rg-p2-oci = import ./lib/oci.nix {
-            inherit pkgs; package = rg-p2; name = "rg-p2"; entrypoint = "/bin/rg.wasm"; wasi = "wasip2";
+            inherit pkgs; package = rg-p2; name = "rg"; entrypoint = "/bin/rg.wasm"; wasi = "wasip2";
           };
           jq-oci = import ./lib/oci.nix {
             inherit pkgs;

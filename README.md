@@ -57,7 +57,9 @@ nix build .#rg-p2-oci -o result-rg-p2-oci
 
 Checks cover stdin, regex matching, case-insensitive file search, recursive traversal, ignore/hidden-file filtering, exit behavior, P2 validation/interface imports, and OCI descriptors. P2 is verified with Wasmtime here; execution in Emmux's developing P2 implementation remains an integration check there.
 
-CI builds separate binary/license and OCI-layout artifacts for `jq`, `rg-p1`, and `rg-p2`. Successful builds on pushes to `main` automatically publish the checked OCI artifacts. The manual publish workflow also accepts a package choice and targets `ghcr.io/<owner>/<repo>/<package>:<version>`. Pull requests and other branches only build and test.
+CI builds separate binary/license and OCI-layout artifacts for `jq`, `rg-p1`, and `rg-p2`. Successful builds on pushes to `main` automatically publish the checked OCI artifacts. The manual publish workflow also accepts a package choice and targets `ghcr.io/<owner>/<repo>/rg:<version>-wasip1` or `rg:<version>-wasip2` for ripgrep, and `jq:<version>` for jq. Pull requests and other branches only build and test.
+
+Ripgrep shares one GHCR package, `ghcr.io/laontme/wasm-packages/rg`, with tags `15.2.0-wasip1` and `15.2.0-wasip2`. Nix attributes and CI artifact names remain `rg-p1` and `rg-p2`. Earlier publications under `rg-p1:15.2.0` and `rg-p2:15.2.0` are legacy locations.
 
 ## OCI contract
 
@@ -98,7 +100,7 @@ Local builds and checks do not publish. The build workflow tests and uploads
 GitHub Actions artifacts, then publishes all packages after all checks pass
 on pushes to `main`. It copies the checked OCI layouts without rebuilding.
 The separate publish workflow supports manual publication of one package to
-`ghcr.io/<owner>/<repo>/<package>:<version>`, using `GITHUB_TOKEN` with `packages:write`.
+`ghcr.io/<owner>/<repo>/rg:<version>-wasip1` or `rg:<version>-wasip2` for ripgrep, and `jq:<version>` for jq, using `GITHUB_TOKEN` with `packages:write`.
 There is no automatic `latest` update. GHCR package visibility is managed
 separately in GitHub.
 
