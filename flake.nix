@@ -22,11 +22,18 @@
             targets = [ "wasm32-wasip1" ];
           };
           rustPlatform = pkgs.makeRustPlatform { cargo = toolchain; rustc = toolchain; };
+          coreutilsToolchain = rustPkgs.rust-bin.stable."1.88.0".minimal.override { targets = [ "wasm32-wasip1" ]; };
+          coreutilsRust = pkgs.makeRustPlatform { cargo = coreutilsToolchain; rustc = coreutilsToolchain; };
+          coreutils = import ./packages/coreutils.nix { inherit pkgs; rustPlatform = coreutilsRust; };
           ripgrep = import ./packages/ripgrep.nix { inherit pkgs rustPlatform; target = "wasm32-wasip1"; };
           jq = cross.callPackage ./packages/jq.nix { upstream = pkgs.jq; };
         in {
-          inherit jq ripgrep;
+          inherit jq ripgrep coreutils;
           default = jq;
+          coreutils-oci = import ./lib/oci.nix {
+            inherit pkgs; package = coreutils; name = "coreutils"; entrypoint = "/bin/coreutils.wasm";
+            commandsFile = "${coreutils}/share/coreutils/commands.txt";
+          };
           ripgrep-oci = import ./lib/oci.nix {
             inherit pkgs; package = ripgrep; name = "ripgrep"; commands = [ "rg" ]; entrypoint = "/bin/rg.wasm";
           };
@@ -42,6 +49,12 @@
           pkgs = import nixpkgs { inherit system; };
           packages = self.packages.${system};
         in {
+          coreutils = pkgs.runCommand "coreutils-check" { nativeBuildInputs = [ pkgs.wasmtime pkgs.python3 ]; } ''
+            export HOME="$TMPDIR"
+            python ${./tests/coreutils.py} ${packages.coreutils}/bin/coreutils.wasm ${packages.coreutils}/share/coreutils/commands.txt
+            python ${./tests/oci.py} ${packages.coreutils-oci} ${packages.coreutils}/bin/coreutils.wasm wasip1 - "$(paste -sd, ${packages.coreutils}/share/coreutils/commands.txt)"
+            touch $out
+          '';
           ripgrep = pkgs.runCommand "ripgrep-check" { nativeBuildInputs = [ pkgs.wasmtime pkgs.python3 ]; } ''
             export HOME="$TMPDIR"
             bash ${./tests/rg.sh} ${packages.ripgrep}/bin/rg.wasm ${packages.ripgrep.version} 2

@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        package: [jq, ripgrep]
+        package: [jq, ripgrep, coreutils]
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@v21
@@ -22,7 +22,7 @@ jobs:
           name: ${{ matrix.package }}-wasi
           path: |
             result-package/bin/*.wasm
-            result-package/share/licenses/
+            result-package/share/
       - run: tar -chf ${{ matrix.package }}-oci.tar -C result-oci .
       - uses: actions/upload-artifact@v4
         with:
@@ -37,7 +37,7 @@ jobs:
       packages: write
     strategy:
       matrix:
-        package: [jq, ripgrep]
+        package: [jq, ripgrep, coreutils]
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@v21

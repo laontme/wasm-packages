@@ -1,14 +1,15 @@
-{ pkgs, package, name, entrypoint, wasi ? "wasip1", commands ? [ name ] }:
+{ pkgs, package, name, entrypoint, wasi ? "wasip1", commands ? [ name ], commandsFile ? null }:
 let
   annotations = {
     "org.opencontainers.image.description" = package.meta.description;
-    "me.laont.wasm.commands" = pkgs.lib.concatStringsSep "," commands;
     "org.opencontainers.image.title" = name;
     "org.opencontainers.image.version" = package.version;
     "org.opencontainers.image.source" = "https://github.com/laontme/wasm-packages";
     "org.opencontainers.image.licenses" = pkgs.lib.concatMapStringsSep " AND "
       (license: license.spdxId) (pkgs.lib.toList package.meta.license);
     "org.opencontainers.image.created" = "1970-01-01T00:00:00Z";
+  } // pkgs.lib.optionalAttrs (commandsFile == null) {
+    "me.laont.wasm.commands" = pkgs.lib.concatStringsSep "," commands;
   };
   annotationFlags = pkgs.lib.concatStringsSep " " (pkgs.lib.mapAttrsToList
     (key: value: "--annotation ${pkgs.lib.escapeShellArg "${key}=${value}"}") annotations);
@@ -31,5 +32,5 @@ pkgs.runCommand "${name}-${package.version}-oci" {
     '{architecture: "wasm", os: $os, layerDigests: [$digest]} ${pkgs.lib.optionalString (wasi == "wasip2") "+ {component: {imports: $imports[0], exports: $exports[0]}}"}' > config.json
   oras push --no-tty --oci-layout "$out:${package.version}" --image-spec v1.0 \
     --config config.json:application/vnd.wasm.config.v0+json \
-    ${annotationFlags} ${pkgs.lib.escapeShellArg "${name}.wasm:application/wasm"}
+    ${annotationFlags} ${pkgs.lib.optionalString (commandsFile != null) ''--annotation "me.laont.wasm.commands=$(paste -sd, ${commandsFile})"''} ${pkgs.lib.escapeShellArg "${name}.wasm:application/wasm"}
 ''
