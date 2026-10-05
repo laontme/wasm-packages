@@ -59,7 +59,7 @@ Checks cover stdin, regex matching, case-insensitive file search, recursive trav
 
 CI builds separate binary/license and OCI-layout artifacts for `jq`, `rg-p1`, and `rg-p2`. Successful builds on pushes to `main` automatically publish the checked OCI artifacts. The manual publish workflow also accepts a package choice and targets `ghcr.io/<owner>/<repo>/rg:<version>-wasip1` or `rg:<version>-wasip2` for ripgrep, and `jq:<version>` for jq. Pull requests and other branches only build and test.
 
-Ripgrep shares one GHCR package, `ghcr.io/laontme/wasm-packages/rg`, with tags `15.2.0-wasip1` and `15.2.0-wasip2`. Nix attributes and CI artifact names remain `rg-p1` and `rg-p2`. Earlier publications under `rg-p1:15.2.0` and `rg-p2:15.2.0` are legacy locations.
+Ripgrep shares one GHCR package, `ghcr.io/laontme/wasm-packages/rg`, with tags `15.2.0-wasip1` and `15.2.0-wasip2`. Nix attributes and CI artifact names remain `rg-p1` and `rg-p2`.
 
 ## OCI contract
 
