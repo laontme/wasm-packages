@@ -56,11 +56,15 @@ jobs:
           tar -xf "artifact/$PACKAGE-oci.tar" -C oci-layout
           version=$(nix eval --raw ".#$PACKAGE.version")
           case "$PACKAGE" in
-            rg-p1) image=rg; tag="$version-wasip1" ;;
-            rg-p2) image=rg; tag="$version-wasip2" ;;
-            *) image="$PACKAGE"; tag="$version" ;;
+            rg-p1) image=rg; tag="$version-wasip1"; default_variant=false ;;
+            rg-p2) image=rg; tag="$version-wasip2"; default_variant=true ;;
+            jq) image=jq; tag="$version-wasip1"; default_variant=true ;;
+            *) echo "Unsupported package: $PACKAGE" >&2; exit 1 ;;
           esac
           registry="ghcr.io/${REPOSITORY,,}/$image"
           export ORAS_REGISTRY_CONFIG="$RUNNER_TEMP/ghcr-auth.json"
           printf '%s' "$GHCR_TOKEN" | nix develop -c oras login --registry-config "$ORAS_REGISTRY_CONFIG" --username "$GHCR_USER" --password-stdin ghcr.io
           nix develop -c oras cp --to-registry-config "$ORAS_REGISTRY_CONFIG" --from-oci-layout "oci-layout:$version" "$registry:$tag"
+          if [ "$default_variant" = true ]; then
+            nix develop -c oras tag --registry-config "$ORAS_REGISTRY_CONFIG" "$registry:$tag" "$version" latest
+          fi

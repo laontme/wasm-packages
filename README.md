@@ -61,6 +61,15 @@ CI builds separate binary/license and OCI-layout artifacts for `jq`, `rg-p1`, an
 
 Ripgrep shares one GHCR package, `ghcr.io/laontme/wasm-packages/rg`, with tags `15.2.0-wasip1` and `15.2.0-wasip2`. Nix attributes and CI artifact names remain `rg-p1` and `rg-p2`.
 
+## Image tags
+
+| Package | Explicit tags | Default version tag | `latest` |
+|---|---|---|---|
+| rg | `15.2.0-wasip1`, `15.2.0-wasip2` | `15.2.0` → P2 | P2 |
+| jq | `1.8.2-wasip1` | `1.8.2` → P1 | P1 |
+
+The default means the latest software release using the newest WASI target supported and tested for that package. Until jq has a P2 package, it defaults to P1. Only the default variant updates bare version and `latest` tags; publishing rg P1 cannot replace rg's P2 defaults. Consumers needing a fixed WASI target use the suffix; consumers needing fixed bytes pin a digest. Moving aliases can change when a new release or supported WASI variant is published.
+
 ## OCI contract
 
 `jq-oci`, `rg-p1-oci`, and `rg-p2-oci` produce OCI layouts following the
@@ -101,7 +110,7 @@ GitHub Actions artifacts, then publishes all packages after all checks pass
 on pushes to `main`. It copies the checked OCI layouts without rebuilding.
 The separate publish workflow supports manual publication of one package to
 `ghcr.io/<owner>/<repo>/rg:<version>-wasip1` or `rg:<version>-wasip2` for ripgrep, and `jq:<version>` for jq, using `GITHUB_TOKEN` with `packages:write`.
-There is no automatic `latest` update. GHCR package visibility is managed
+Bare version and `latest` tags select the newest supported WASI variant: P2 for rg, P1 for jq. These tags alias the explicit variant and have identical manifest digests. GHCR package visibility is managed
 separately in GitHub.
 
 To publish manually when ready:
