@@ -22,13 +22,13 @@
             targets = [ "wasm32-wasip1" ];
           };
           rustPlatform = pkgs.makeRustPlatform { cargo = toolchain; rustc = toolchain; };
-          rg = import ./packages/ripgrep.nix { inherit pkgs rustPlatform; target = "wasm32-wasip1"; };
+          ripgrep = import ./packages/ripgrep.nix { inherit pkgs rustPlatform; target = "wasm32-wasip1"; };
           jq = cross.callPackage ./packages/jq.nix { upstream = pkgs.jq; };
         in {
-          inherit jq rg;
+          inherit jq ripgrep;
           default = jq;
-          rg-oci = import ./lib/oci.nix {
-            inherit pkgs; package = rg; name = "rg"; entrypoint = "/bin/rg.wasm";
+          ripgrep-oci = import ./lib/oci.nix {
+            inherit pkgs; package = ripgrep; name = "ripgrep"; commands = [ "rg" ]; entrypoint = "/bin/rg.wasm";
           };
           jq-oci = import ./lib/oci.nix {
             inherit pkgs;
@@ -42,10 +42,10 @@
           pkgs = import nixpkgs { inherit system; };
           packages = self.packages.${system};
         in {
-          rg = pkgs.runCommand "rg-check" { nativeBuildInputs = [ pkgs.wasmtime pkgs.python3 ]; } ''
+          ripgrep = pkgs.runCommand "ripgrep-check" { nativeBuildInputs = [ pkgs.wasmtime pkgs.python3 ]; } ''
             export HOME="$TMPDIR"
-            bash ${./tests/rg.sh} ${packages.rg}/bin/rg.wasm ${packages.rg.version} 2
-            python ${./tests/oci.py} ${packages.rg-oci} ${packages.rg}/bin/rg.wasm wasip1
+            bash ${./tests/rg.sh} ${packages.ripgrep}/bin/rg.wasm ${packages.ripgrep.version} 2
+            python ${./tests/oci.py} ${packages.ripgrep-oci} ${packages.ripgrep}/bin/rg.wasm wasip1
             touch $out
           '';
           jq = pkgs.runCommand "jq-wasi-check" {

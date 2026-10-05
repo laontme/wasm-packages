@@ -1,0 +1,17 @@
+name: Remove renamed rg package
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify ripgrep replacement and remove rg
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api 'users/laontme/packages/container/wasm-packages%2Fripgrep/versions' > versions.json
+          jq -e 'any(.[].metadata.container.tags[]; . == "15.2.0") and any(.[].metadata.container.tags[]; . == "latest")' versions.json
+          gh api --method DELETE 'users/laontme/packages/container/wasm-packages%2Frg'

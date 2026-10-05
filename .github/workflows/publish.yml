@@ -6,7 +6,7 @@ on:
         description: Package to publish
         type: choice
         default: jq
-        options: [jq, rg]
+        options: [jq, ripgrep]
 permissions:
   contents: read
   packages: write

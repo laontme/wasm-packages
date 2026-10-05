@@ -16,5 +16,6 @@ rustPlatform.buildRustPackage {
     cp target/${target}/release/rg.wasm $out/bin/rg.wasm
     cp LICENSE-MIT UNLICENSE $out/share/licenses/rg/
   '';
+  meta.description = pkgs.ripgrep.meta.description;
   meta.license = [ pkgs.lib.licenses.mit pkgs.lib.licenses.unlicense ];
 }

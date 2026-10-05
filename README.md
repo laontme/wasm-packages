@@ -8,7 +8,7 @@ as CNCF Wasm OCI artifacts to GHCR.
 | Package | Version | Minimum WASI | Commands | GHCR |
 |---|---|---|---|---|
 | jq | 1.8.2 | Preview 1 | `jq` | `ghcr.io/laontme/wasm-packages/jq:1.8.2` |
-| ripgrep | 15.2.0 | Preview 1 | `rg` | `ghcr.io/laontme/wasm-packages/rg:15.2.0` |
+| ripgrep | 15.2.0 | Preview 1 | `rg` | `ghcr.io/laontme/wasm-packages/ripgrep:15.2.0` |
 
 Each package has a software-version tag and `latest`. Neither includes a WASI
 suffix. Build for the **lowest WASI version that supports the required tool
@@ -26,8 +26,8 @@ Different build hosts can produce different bytes, even with the same sources.
 
 ```sh
 nix build .#jq -o result-jq
-nix build .#rg -o result-rg
-nix build .#rg-oci -o result-rg-oci
+nix build .#ripgrep -o result-rg
+nix build .#ripgrep-oci -o result-rg-oci
 nix develop
 printf '{"hello":"world"}\n' | wasmtime result-jq/bin/jq.wasm -r '.hello'
 printf 'hello world\n' | wasmtime result-rg/bin/rg.wasm hello -
@@ -54,8 +54,8 @@ Layouts follow the [CNCF Wasm OCI format](https://tag-runtime.cncf.io/wgs/wasm/d
 - P2 components include their imports/exports in `component` config metadata.
 - Manifest annotation `me.laont.wasm.commands` is an ordered comma-separated
   string: `jq` or `rg` for current packages. No spaces or duplicate entries.
-  The package's main command is first.
-- Source, version, license and a fixed creation timestamp are annotations.
+  The main command is first; package names and command names may differ.
+- Description (from the pinned Nixpkgs upstream package metadata), source, version, license and a fixed creation timestamp are annotations.
   License notices remain in the Nix package and CI binary/license artifact.
 
 For a multicall coreutils package, the annotation will look like
@@ -77,7 +77,7 @@ exit codes, plus OCI content and command metadata.
 Pushes, pull requests and manual builds check packages and upload their binaries,
 licenses and OCI layouts. After all checks pass, pushes to `main` automatically
 publish the exact checked layouts under version tags and update `latest`.
-The separate manual publish workflow accepts `jq` or `rg`. Local builds never
+The separate manual publish workflow accepts `jq` or `ripgrep`. Local builds never
 publish. GHCR package visibility is managed separately in GitHub.
 
 ## Next package: full uutils coreutils

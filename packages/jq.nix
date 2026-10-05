@@ -22,7 +22,7 @@ stdenv.mkDerivation {
     runHook postInstall
   '';
   meta = {
-    description = "jq command compiled for WASI Preview 1";
+    description = upstream.meta.description;
     license = [ lib.licenses.mit lib.licenses.bsd2 ];
   };
 }

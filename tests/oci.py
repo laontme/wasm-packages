@@ -18,7 +18,10 @@ index = json.loads((root / "index.json").read_text())
 assert len(index["manifests"]) == 1
 manifest = json.loads(read(index["manifests"][0]))
 commands = manifest["annotations"]["me.laont.wasm.commands"].split(",")
-assert commands[0] == manifest["annotations"]["org.opencontainers.image.title"]
+assert manifest["annotations"]["org.opencontainers.image.description"]
+expected_command = {"ripgrep": "rg", "jq": "jq"}.get(manifest["annotations"]["org.opencontainers.image.title"])
+if expected_command:
+    assert commands == [expected_command]
 assert len(commands) == len(set(commands))
 assert all(commands)
 if len(sys.argv) > 5:
