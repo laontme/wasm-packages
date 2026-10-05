@@ -28,3 +28,34 @@ jobs:
         with:
           name: ${{ matrix.package }}-oci
           path: ${{ matrix.package }}-oci.tar
+  publish:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        package: [jq, rg-p1, rg-p2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@v21
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.package }}-oci
+          path: artifact
+      - name: Publish checked OCI artifact
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          REPOSITORY: ${{ github.repository }}
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          mkdir oci-layout
+          tar -xf "artifact/$PACKAGE-oci.tar" -C oci-layout
+          version=$(nix eval --raw ".#$PACKAGE.version")
+          registry="ghcr.io/${REPOSITORY,,}/$PACKAGE"
+          export ORAS_REGISTRY_CONFIG="$RUNNER_TEMP/ghcr-auth.json"
+          printf '%s' "$GHCR_TOKEN" | nix develop -c oras login --registry-config "$ORAS_REGISTRY_CONFIG" --username "$GHCR_USER" --password-stdin ghcr.io
+          nix develop -c oras cp --to-registry-config "$ORAS_REGISTRY_CONFIG" --from-oci-layout "oci-layout:$version" "$registry:$version"
