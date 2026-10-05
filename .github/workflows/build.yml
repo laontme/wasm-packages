@@ -6,22 +6,25 @@ on:
 permissions:
   contents: read
 jobs:
-  jq:
+  build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: [jq, rg-p1, rg-p2]
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@v21
-      - run: nix flake check -L
-      - run: nix build .#jq -o result-jq
-      - run: nix build .#jq-oci -o result-oci
+      - run: nix build .#checks.x86_64-linux.${{ matrix.package }} -L
+      - run: nix build .#${{ matrix.package }} -o result-package
+      - run: nix build .#${{ matrix.package }}-oci -o result-oci
       - uses: actions/upload-artifact@v4
         with:
-          name: jq-wasi
+          name: ${{ matrix.package }}-wasi
           path: |
-            result-jq/bin/jq.wasm
-            result-jq/share/licenses/jq/
-      - run: tar -chf jq-oci.tar -C result-oci .
+            result-package/bin/*.wasm
+            result-package/share/licenses/
+      - run: tar -chf ${{ matrix.package }}-oci.tar -C result-oci .
       - uses: actions/upload-artifact@v4
         with:
-          name: jq-oci
-          path: jq-oci.tar
+          name: ${{ matrix.package }}-oci
+          path: ${{ matrix.package }}-oci.tar

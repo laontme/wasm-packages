@@ -1,4 +1,4 @@
-{ pkgs, package, name, entrypoint }:
+{ pkgs, package, name, entrypoint, wasi ? "wasip1" }:
 let
   annotations = {
     "org.opencontainers.image.title" = name;
@@ -13,12 +13,17 @@ let
 in
 assert pkgs.lib.hasPrefix "/" entrypoint;
 pkgs.runCommand "${name}-${package.version}-oci" {
-  nativeBuildInputs = [ pkgs.oras pkgs.jq pkgs.coreutils ];
+  nativeBuildInputs = [ pkgs.oras pkgs.jq pkgs.coreutils ] ++ pkgs.lib.optional (wasi == "wasip2") pkgs.wasm-tools;
 } ''
   cp ${package}${entrypoint} ${pkgs.lib.escapeShellArg "${name}.wasm"}
   digest="sha256:$(sha256sum ${pkgs.lib.escapeShellArg "${name}.wasm"} | cut -d ' ' -f 1)"
-  jq -cnS --arg digest "$digest" \
-    '{architecture: "wasm", os: "wasip1", layerDigests: [$digest]}' > config.json
+  ${pkgs.lib.optionalString (wasi == "wasip2") ''
+    wasm-tools component wit ${pkgs.lib.escapeShellArg "${name}.wasm"} > component.wit
+    sed -n 's/^  import \(.*\);$/\1/p' component.wit | jq -Rn '[inputs]' > imports.json
+    sed -n 's/^  export \(.*\);$/\1/p' component.wit | jq -Rn '[inputs]' > exports.json
+  ''}
+  jq -cnS ${pkgs.lib.optionalString (wasi == "wasip2") "--slurpfile imports imports.json --slurpfile exports exports.json"} --arg digest "$digest" --arg os ${pkgs.lib.escapeShellArg wasi} \
+    '{architecture: "wasm", os: $os, layerDigests: [$digest]} ${pkgs.lib.optionalString (wasi == "wasip2") "+ {component: {imports: $imports[0], exports: $exports[0]}}"}' > config.json
   oras push --no-tty --oci-layout "$out:${package.version}" --image-spec v1.0 \
     --config config.json:application/vnd.wasm.config.v0+json \
     ${annotationFlags} ${pkgs.lib.escapeShellArg "${name}.wasm:application/wasm"}
