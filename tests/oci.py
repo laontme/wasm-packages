@@ -44,5 +44,32 @@ layer = manifest["layers"][0]
 assert layer["mediaType"] == "application/wasm"
 assert config["layerDigests"] == [layer["digest"]]
 wasm = read(layer)
+if manifest["annotations"]["org.opencontainers.image.title"] == "ripgrep":
+    assert len(wasm) <= 16 * 1024 * 1024, "ripgrep exceeds Emmux module limit"
 assert wasm == pathlib.Path(sys.argv[2]).read_bytes()
 assert wasm[:8] == (b"\0asm\x0d\0\x01\0" if wasi == "wasip2" else b"\0asm\x01\0\0\0")
+
+# Validate the actual OCI payload, so CI cannot publish DWARF-heavy modules.
+if wasi == "wasip1":
+    def uleb(offset):
+        value, shift = 0, 0
+        while True:
+            byte = wasm[offset]
+            offset += 1
+            value |= (byte & 127) << shift
+            if byte < 128:
+                return value, offset
+            shift += 7
+
+    offset = 8
+    while offset < len(wasm):
+        section_id = wasm[offset]
+        size, start = uleb(offset + 1)
+        offset = start + size
+        assert offset <= len(wasm)
+        if section_id == 0:
+            length, name_start = uleb(start)
+            name = wasm[name_start:name_start + length].decode("utf-8")
+            assert not name.startswith(".debug_"), name
+            assert name not in {"name", "sourceMappingURL", "external_debug_info"}, name
+    assert offset == len(wasm)

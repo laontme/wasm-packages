@@ -10,6 +10,7 @@ rustPlatform.buildRustPackage {
     runHook postBuild
   '';
   doCheck = false;
+  # Native stripping is disabled; exported packages use lib/strip-wasm.nix.
   dontStrip = true;
   installPhase = ''
     mkdir -p $out/bin $out/share/licenses/rg

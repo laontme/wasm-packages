@@ -12,6 +12,7 @@ stdenv.mkDerivation {
   ];
   env.CFLAGS = "-O2 -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS";
   env.LDFLAGS = "-lwasi-emulated-signal -lwasi-emulated-process-clocks";
+  # Native stripping is disabled; exported packages use lib/strip-wasm.nix.
   dontStrip = true;
   installPhase = ''
     runHook preInstall

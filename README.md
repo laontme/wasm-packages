@@ -54,7 +54,9 @@ Rust regex matching is supported. P1 retains rg's exit codes 0/1/2.
 ## OCI and command discovery
 
 Layouts follow the [CNCF Wasm OCI format](https://tag-runtime.cncf.io/wgs/wasm/deliverables/wasm-oci-artifact/).
-`lib/oci.nix` uses ORAS to serialize and assemble artifacts.
+`lib/strip-wasm.nix` removes DWARF, debug names and source-map references from
+every exported package before testing and OCI assembly. ABI/feature custom
+sections are preserved. `lib/oci.nix` uses ORAS to serialize and assemble artifacts.
 
 - Manifest: `application/vnd.oci.image.manifest.v1+json`.
 - Config: `application/vnd.wasm.config.v0+json`, `architecture: wasm`,
@@ -137,4 +139,6 @@ Both execute real CPython, but go-python transpiles its Wasm build into Go and
 adds typed callbacks and host policy hooks. A standard WASI P1 command does
 not include those hooks: Emmux must provide a separate protocol for tool calls.
 Networking, subprocess execution, native threads and arbitrary native pip
-extensions are not supported by this package. No pip/ensurepip is bundled.
+extensions are not supported by this package. No pip/ensurepip is bundled. The stripped module is about 18 MB, exceeding
+Emmux's current 16 MiB module limit; using it there requires a higher limit
+or a smaller stdlib build.

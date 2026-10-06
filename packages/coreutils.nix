@@ -13,6 +13,7 @@ rustPlatform.buildRustPackage {
   '';
   nativeBuildInputs = [ pkgs.wasmtime pkgs.python3 ];
   doCheck = false;
+  # Native stripping is disabled; exported packages use lib/strip-wasm.nix.
   dontStrip = true;
   installPhase = ''
     runHook preInstall

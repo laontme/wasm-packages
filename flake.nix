@@ -24,10 +24,11 @@
           rustPlatform = pkgs.makeRustPlatform { cargo = toolchain; rustc = toolchain; };
           coreutilsToolchain = rustPkgs.rust-bin.stable."1.88.0".minimal.override { targets = [ "wasm32-wasip1" ]; };
           coreutilsRust = pkgs.makeRustPlatform { cargo = coreutilsToolchain; rustc = coreutilsToolchain; };
-          coreutils = import ./packages/coreutils.nix { inherit pkgs; rustPlatform = coreutilsRust; };
-          ripgrep = import ./packages/ripgrep.nix { inherit pkgs rustPlatform; target = "wasm32-wasip1"; };
-          python = cross.callPackage ./packages/python.nix { upstream = pkgs.python314; buildPython = pkgs.python314; };
-          jq = cross.callPackage ./packages/jq.nix { upstream = pkgs.jq; };
+          stripWasm = package: import ./lib/strip-wasm.nix { inherit pkgs package; };
+          coreutils = stripWasm (import ./packages/coreutils.nix { inherit pkgs; rustPlatform = coreutilsRust; });
+          ripgrep = stripWasm (import ./packages/ripgrep.nix { inherit pkgs rustPlatform; target = "wasm32-wasip1"; });
+          python = stripWasm (cross.callPackage ./packages/python.nix { upstream = pkgs.python314; buildPython = pkgs.python314; });
+          jq = stripWasm (cross.callPackage ./packages/jq.nix { upstream = pkgs.jq; });
         in {
           inherit jq ripgrep coreutils python;
           default = jq;

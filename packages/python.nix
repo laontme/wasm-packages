@@ -22,6 +22,7 @@ stdenv.mkDerivation {
     "--with-frozen-modules"
   ];
   env.CFLAGS = "-O2 -g0";
+  # Native stripping is disabled; exported packages use lib/strip-wasm.nix.
   dontStrip = true;
   installPhase = ''
     runHook preInstall
