@@ -26,10 +26,14 @@
           coreutilsRust = pkgs.makeRustPlatform { cargo = coreutilsToolchain; rustc = coreutilsToolchain; };
           coreutils = import ./packages/coreutils.nix { inherit pkgs; rustPlatform = coreutilsRust; };
           ripgrep = import ./packages/ripgrep.nix { inherit pkgs rustPlatform; target = "wasm32-wasip1"; };
+          python = cross.callPackage ./packages/python.nix { upstream = pkgs.python314; buildPython = pkgs.python314; };
           jq = cross.callPackage ./packages/jq.nix { upstream = pkgs.jq; };
         in {
-          inherit jq ripgrep coreutils;
+          inherit jq ripgrep coreutils python;
           default = jq;
+          python-oci = import ./lib/oci.nix {
+            inherit pkgs; package = python; name = "python"; entrypoint = "/bin/python.wasm";
+          };
           coreutils-oci = import ./lib/oci.nix {
             inherit pkgs; package = coreutils; name = "coreutils"; entrypoint = "/bin/coreutils.wasm";
             commandsFile = "${coreutils}/share/coreutils/commands.txt";
@@ -49,6 +53,12 @@
           pkgs = import nixpkgs { inherit system; };
           packages = self.packages.${system};
         in {
+          python = pkgs.runCommand "python-check" { nativeBuildInputs = [ pkgs.wasmtime pkgs.python3 ]; } ''
+            export HOME="$TMPDIR"
+            python ${./tests/python.py} ${packages.python}/bin/python.wasm ${packages.python.version}
+            python ${./tests/oci.py} ${packages.python-oci} ${packages.python}/bin/python.wasm wasip1 - python
+            touch $out
+          '';
           coreutils = pkgs.runCommand "coreutils-check" { nativeBuildInputs = [ pkgs.wasmtime pkgs.python3 ]; } ''
             export HOME="$TMPDIR"
             python ${./tests/coreutils.py} ${packages.coreutils}/bin/coreutils.wasm ${packages.coreutils}/share/coreutils/commands.txt

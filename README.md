@@ -9,6 +9,7 @@ as CNCF Wasm OCI artifacts to GHCR.
 |---|---|---|---|---|
 | jq | 1.8.2 | Preview 1 | `jq` | `ghcr.io/laontme/wasm-packages/jq:1.8.2` |
 | ripgrep | 15.2.0 | Preview 1 | `rg` | `ghcr.io/laontme/wasm-packages/ripgrep:15.2.0` |
+| Python | 3.14.7 | Preview 1 | `python` | `ghcr.io/laontme/wasm-packages/python:3.14.7` |
 | uutils coreutils | 0.12.0 | Preview 1 | `coreutils` + 79 applets | `ghcr.io/laontme/wasm-packages/coreutils:0.12.0` |
 
 Each package has a software-version tag and `latest`. Neither includes a WASI
@@ -29,6 +30,7 @@ Different build hosts can produce different bytes, even with the same sources.
 nix build .#jq -o result-jq
 nix build .#ripgrep -o result-rg
 nix build .#ripgrep-oci -o result-rg-oci
+nix build .#python -o result-python
 nix build .#coreutils -o result-coreutils
 nix build .#coreutils-oci -o result-coreutils-oci
 nix develop
@@ -38,6 +40,7 @@ wasmtime --dir .::/work result-rg/bin/rg.wasm hello /work
 wasmtime result-coreutils/bin/coreutils.wasm --list
 printf 'hello\n' | wasmtime result-coreutils/bin/coreutils.wasm cat
 wasmtime --dir .::/ result-coreutils/bin/coreutils.wasm ls /
+wasmtime result-python/bin/python.wasm -c 'import json; print(json.dumps({"hello": "world"}))'
 nix flake check -L
 ```
 
@@ -84,7 +87,7 @@ plus OCI content and command metadata.
 Pushes, pull requests and manual builds check packages and upload their binaries,
 licenses, command inventories and OCI layouts. After all checks pass, pushes to `main` automatically
 publish the exact checked layouts under version tags and update `latest`.
-The separate manual publish workflow accepts `jq`, `ripgrep` or `coreutils`. Local builds never
+The separate manual publish workflow accepts `jq`, `ripgrep`, `coreutils` or `python`. Local builds never
 publish. GHCR package visibility is managed separately in GitHub.
 
 ## uutils coreutils
@@ -110,3 +113,28 @@ For coreutils, mount the working tree at guest `/` (for example,
 requires access to guest `/`; granting only `/work` can make these operations
 fail even when both operands are inside `/work`. Only the granted host tree
 is accessible through that guest root.
+
+## Python
+
+The package builds upstream CPython 3.14.7 for WASI P1. Pure-Python standard
+library modules are frozen into the executable, so the single raw OCI Wasm
+layer runs without a separate stdlib directory. Tests, IDLE/Tk, turtle demos
+and ensurepip are omitted. The included frozen-module inventory is available
+in `share/python/frozen-stdlib.txt`; optional C extensions depend on the build
+and unavailable OS features remain unavailable. This build includes zlib/gzip
+and omits SQLite, SSL, ctypes, bz2/lzma/zstd, readline and the C UUID extension. Frozen modules have no backing
+source files or package data directory. `-X frozen_modules=off` is unsupported.
+
+Use `python -c`, `python -m`, stdin, or a script file. Grant the consumer access
+to your scripts and data, for example:
+
+```sh
+wasmtime --dir .::/ result-python/bin/python.wasm /script.py
+```
+
+This is a Python CLI, not Emmux's existing `goccy/go-python` embedding API.
+Both execute real CPython, but go-python transpiles its Wasm build into Go and
+adds typed callbacks and host policy hooks. A standard WASI P1 command does
+not include those hooks: Emmux must provide a separate protocol for tool calls.
+Networking, subprocess execution, native threads and arbitrary native pip
+extensions are not supported by this package. No pip/ensurepip is bundled.
