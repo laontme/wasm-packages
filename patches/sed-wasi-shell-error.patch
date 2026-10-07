@@ -1,0 +1,20 @@
+--- a/src/sed/processor.rs
++++ b/src/sed/processor.rs
+@@ -213,8 +213,16 @@
+     c
+ }
+
++// WASI process spawning returns Unsupported; let shell_stdout report the error.
++#[cfg(target_os = "wasi")]
++fn shell_command(cmd: &OsStr) -> std::process::Command {
++    let mut c = std::process::Command::new("/bin/sh");
++    c.arg("-c").arg(cmd);
++    c
++}
++
+ // Fallback if the target OS is neither Windows nor UNIX-like
+-#[cfg(not(any(unix, windows)))]
++#[cfg(not(any(unix, windows, target_os = "wasi")))]
+ fn shell_command(_cmd: &OsStr) -> std::process::Command {
+     unimplemented!("the 'e' substitute flag requires a platform shell (/bin/sh or cmd.exe)");
+ }

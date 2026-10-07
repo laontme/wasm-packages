@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        package: [jq, ripgrep, coreutils, python]
+        package: [jq, ripgrep, coreutils, python, findutils, grep, sed]
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@v21
@@ -37,7 +37,7 @@ jobs:
       packages: write
     strategy:
       matrix:
-        package: [jq, ripgrep, coreutils, python]
+        package: [jq, ripgrep, coreutils, python, findutils, grep, sed]
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@v21

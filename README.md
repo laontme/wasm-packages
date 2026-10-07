@@ -11,6 +11,9 @@ as CNCF Wasm OCI artifacts to GHCR.
 | ripgrep | 15.2.0 | Preview 1 | `rg` | `ghcr.io/laontme/wasm-packages/ripgrep:15.2.0` |
 | Python | 3.14.7 | Preview 1 | `python` | `ghcr.io/laontme/wasm-packages/python:3.14.7` |
 | uutils coreutils | 0.12.0 | Preview 1 | `coreutils` + 79 applets | `ghcr.io/laontme/wasm-packages/coreutils:0.12.0` |
+| uutils findutils | 0.11.0-pre.eef2c971 | Preview 1 | `findutils`, `find`, `locate`, `updatedb` | `ghcr.io/laontme/wasm-packages/findutils:0.11.0-pre.eef2c971` |
+| uutils grep | 0.2.0-pre.89fa10cb | Preview 1 | `grep` | `ghcr.io/laontme/wasm-packages/grep:0.2.0-pre.89fa10cb` |
+| uutils sed | 0.3.0-pre.e6829c3d | Preview 1 | `sed` | `ghcr.io/laontme/wasm-packages/sed:0.3.0-pre.e6829c3d` |
 
 Each package has a software-version tag and `latest`. Neither includes a WASI
 suffix. Build for the **lowest WASI version that supports the required tool
@@ -20,8 +23,8 @@ only when needed. Do not publish redundant variants or a multi-platform index.
 The config records the selected WASI target, and consumers must check it.
 Pin a digest when exact bytes matter; version and `latest` tags may move.
 
-Nixpkgs and the toolchains are pinned in `flake.lock`. Ripgrep uses Rust 1.85.0; coreutils uses Rust 1.88.0.
-Build hosts are ARM64/x86-64 Linux/macOS; guest architecture is always Wasm.
+Nixpkgs and the toolchains are pinned in `flake.lock`. Ripgrep uses Rust 1.85.0; the uutils packages use Rust 1.88.0.
+Build hosts are ARM64 macOS and ARM64/x86-64 Linux; guest architecture is always Wasm.
 Different build hosts can produce different bytes, even with the same sources.
 
 ## Build and run
@@ -66,7 +69,7 @@ sections are preserved. `lib/oci.nix` uses ORAS to serialize and assemble artifa
 - Manifest annotation `me.laont.wasm.commands` is an ordered comma-separated
   string: `jq`, `rg`, or `coreutils` followed by its applets. No spaces or duplicate entries.
   The main command is first; package names and command names may differ.
-- Description (from the pinned Nixpkgs upstream package metadata), source, version, license and a fixed creation timestamp are annotations.
+- Description (from upstream package metadata), source, version, license and a fixed creation timestamp are annotations.
   License notices remain in the Nix package and CI binary/license artifact.
 
 For the multicall coreutils package, the annotation looks like
@@ -89,7 +92,7 @@ plus OCI content and command metadata.
 Pushes, pull requests and manual builds check packages and upload their binaries,
 licenses, command inventories and OCI layouts. After all checks pass, pushes to `main` automatically
 publish the exact checked layouts under version tags and update `latest`.
-The separate manual publish workflow accepts `jq`, `ripgrep`, `coreutils` or `python`. Local builds never
+The separate manual publish workflow accepts `jq`, `ripgrep`, `coreutils`, `python`, `findutils`, `grep` or `sed`. Local builds never
 publish. GHCR package visibility is managed separately in GitHub.
 
 ## uutils coreutils
@@ -142,3 +145,40 @@ Networking, subprocess execution, native threads and arbitrary native pip
 extensions are not supported by this package. No pip/ensurepip is bundled. The stripped module is about 18 MB, exceeding
 Emmux's current 16 MiB module limit; using it there requires a higher limit
 or a smaller stdlib build.
+
+## uutils findutils, grep and sed
+
+These packages pin upstream development commits, with `-pre.<commit>` versions:
+released versions lag the current WASI work. Sources and Cargo dependencies are
+hash-pinned. They provide common shell operations on P1 without extra host APIs.
+Upstream targets GNU compatibility, but these are not complete GNU replacements;
+regex, locale and OS-specific options can differ. In particular, uutils sed
+supports byte/UTF-8 processing rather than arbitrary locale encodings.
+
+Findutils is packaged as one multicall module. Invoke `findutils find ...`,
+`findutils locate ...`, or `findutils updatedb ...`; argv[0] applet dispatch is
+also supported. Its command annotation is `findutils,find,locate,updatedb`.
+A WASI-only patch replaces Rust's panicking `split_paths` in locate with
+colon-separated database paths. Sed shell-execution requests return an error
+instead of trapping on WASI. Create and query a database inside a granted tree:
+
+```sh
+nix build .#findutils -o result-findutils
+nix build .#grep -o result-grep
+nix build .#sed -o result-sed
+nix develop
+wasmtime --dir .::/ result-findutils/bin/findutils.wasm find / -name '*.rs'
+wasmtime --dir .::/ result-findutils/bin/findutils.wasm updatedb --localpaths=/ --prunepaths= --output=/locatedb
+wasmtime --dir .::/ result-findutils/bin/findutils.wasm locate -d /locatedb '*.rs'
+printf 'hello world\n' | wasmtime result-grep/bin/grep.wasm hello
+printf 'hello world\n' | wasmtime result-sed/bin/sed.wasm 's/world/WASI/'
+```
+
+Mount the working tree at guest `/` for file operations. `xargs` is excluded:
+P1 has no child-process API. Find's `-exec`/`-execdir`/`-ok` and sed's shell
+execution commands are unsupported for the same reason. GNU originals would
+also require a host process extension to perform these operations on P1.
+Checks cover grep regex modes, recursion, stdin and exit codes; sed ranges,
+backreferences, hold space, script files and in-place editing; find filters,
+regex, depth, null output and deletion; updatedb/locate round trips; and OCI
+metadata and stripping for all three packages.

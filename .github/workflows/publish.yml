@@ -6,7 +6,7 @@ on:
         description: Package to publish
         type: choice
         default: jq
-        options: [jq, ripgrep, coreutils, python]
+        options: [jq, ripgrep, coreutils, python, findutils, grep, sed]
 permissions:
   contents: read
   packages: write
